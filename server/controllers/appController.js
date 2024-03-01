@@ -1,11 +1,24 @@
 import UserModel from "../models/User.model.js";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import env from "../config.js";
+
+export async function verifyUser(req, res, next) {
+  try {
+    const { userName } = req.method === "GET" ? req.querry : req.body;
+    let exist = await UserModel.findOne({ userName });
+    if (!exist) return res.status(404).send({ error: "Can't find user" });
+    next();
+  } catch (error) {
+    res.status(404).send({ error: " Authentication Error" });
+  }
+}
 
 export async function register(req, res) {
   try {
     const { userName, password, profile, email } = req.body;
-    //check existing user
 
+    //check existing user
     const userNameExist = new Promise((resolve, reject) => {
       UserModel.findOne({ userName }).then((err, user) => {
         if (err) {
@@ -17,8 +30,8 @@ export async function register(req, res) {
         resolve();
       });
     });
-    //check existing email
 
+    //check existing email
     const emailExist = new Promise((resolve, reject) => {
       UserModel.findOne({ email }).then((err, email) => {
         if (err) {
@@ -70,7 +83,40 @@ export async function register(req, res) {
 }
 
 export async function login(req, res) {
-  res.json("Login route");
+  const { userName, password } = req.body;
+
+  try {
+    UserModel.findOne({ userName })
+      .then((user) => {
+        bcrypt
+          .compare(password, user.password)
+          .then((passwordCheck) => {
+            if (!passwordCheck) {
+              return res
+                .status(400)
+                .send({ error: "Password does not match." });
+            } else {
+              const token = jwt.sign(
+                {
+                  userId: user._id,
+                  userName: user.userName,
+                },
+                env.JWT_SECRET,
+                { expiresIn: "24h" }
+              );
+              return res.status(200).send({
+                message: "Login successful...!",
+                userName: user.userName,
+                token,
+              });
+            }
+          })
+          .catch((error) => res.status(400).send("Don't have password"));
+      })
+      .catch((error) => res.status(404).send("Username not found."));
+  } catch (error) {
+    res.status(500).send({ error });
+  }
 }
 
 export async function getUser(req, res) {
