@@ -120,7 +120,23 @@ export async function login(req, res) {
 }
 
 export async function getUser(req, res) {
-  res.json("Get user route");
+  const { userName } = req.params;
+  try {
+    if (!userName) return res.status(501).send({ error: "Invalid user name" });
+    UserModel.findOne({ userName })
+      .then((user) => {
+        if (!user)
+          return res.status(501).send({ error: "Couldn't find the user" });
+        //remove password and send rest of the data to frontend
+        const { password, ...rest } = Object.assign({}, user.toJSON());
+        return res.status(201).send(rest);
+      })
+      .catch((error) => {
+        return res.status(500).send({ error });
+      });
+  } catch (error) {
+    res.status(404).send({ error: "Cannot find user data" });
+  }
 }
 
 export async function updateUser(req, res) {
