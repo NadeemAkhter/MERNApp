@@ -2,10 +2,11 @@ import UserModel from "../models/User.model.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import env from "../config.js";
+import otpGenerator from "otp-generator";
 
 export async function verifyUser(req, res, next) {
   try {
-    const { userName } = req.method === "GET" ? req.querry : req.body;
+    const { userName } = req.method === "GET" ? req.query : req.body;
     let exist = await UserModel.findOne({ userName });
     if (!exist) return res.status(404).send({ error: "Can't find user" });
     next();
@@ -163,15 +164,33 @@ export async function updateUser(req, res) {
 }
 
 export async function generateOTP(req, res) {
-  res.json("Generate OTP route");
+  req.app.locals.OTP = otpGenerator.generate(6, {
+    lowerCaseAlphabets: false,
+    upperCaseAlphabets: false,
+    specialChars: false,
+  });
+  console.log("I am here", req.app.locals.OTP);
+  res.status(201).send({ code: req.app.locals.OTP });
 }
 
 export async function verifyOTP(req, res) {
-  res.json("Verify OTP route");
+  const { code } = req.query;
+  if (parseInt(req.app.locals.OTP) === parseInt(code)) {
+    req.app.locals.OTP = null; // reset local OTP
+    req.app.locals.resetSession = true; // start session for reset password
+    return res.status(201).send({ message: "Verify successfully" });
+  } else {
+    return res.status(400).send({ error: "Invalid OTP" });
+  }
 }
 
 export async function createResetSession(req, res) {
-  res.json("Create reset session route");
+  if (req.app.locals.resetSession) {
+    req.app.locals.resetSession = false;
+    return res.status(201).send({ message: "Access granted" });
+  } else {
+    res.status(404).send({ error: "Session Expired" });
+  }
 }
 
 export async function resetPassword(req, res) {
